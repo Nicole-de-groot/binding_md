@@ -325,9 +325,9 @@ class MultipleBindingEnsemble(paths.Ensemble):
             in_ensemble = stable_res
 
         logger.info("* In stable contact state: " + keys[stable_res])
-        logger.info("is_check: " + is_check
-                    + " |  in_ensemble: " + in_ensemble
-                    + " |  returning: " + is_check == in_ensemble)
+        logger.info("is_check: " + str(is_check)
+                    + " |  in_ensemble: " + str(in_ensemble)
+                    + " |  returning: " + str(is_check == in_ensemble))
         # if is_check is False (i.e., doing can_append/prepend) then the
         # test is successful if we *are not* in the ensemble. If is_check is
         # True, then the test is successful if we *are* in the ensemble
