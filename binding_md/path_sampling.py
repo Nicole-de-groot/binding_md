@@ -163,6 +163,13 @@ class MultipleBindingEnsembleCache(object):
 
     def _update(self, trajectory, direction=None):
         logger.debug("BEGIN MultipleBindingEnsembleCache._update")
+        def _debug_most_common():
+            if logger.isEnabledFor(logging.DEBUG):
+                n_contacts = self.ensemble.stable_contact_state.n_contacts
+                most_common = \
+                    self.contact_frequency.residue_contacts.most_common()
+                logger.debug("most_common: " + str(most_common[:n_contacts]))
+
         if direction is None:
             direction = self.direction
         direction = clean_direction(direction)
@@ -175,18 +182,21 @@ class MultipleBindingEnsembleCache(object):
         add_freq = self._make_contact_freq(paths.Trajectory([add_frame]))
         logger.debug("Adding frame to contact frequency")
         self.contact_frequency.add_contact_frequency(add_freq)
+        _debug_most_common()
 
         if len(trajectory) > n_frames:
-            sub_frame = {FWD: trajectory[-n_frames],
-                         BKWD: trajectory[n_frames - 1]}[direction]
+            sub_frame = {FWD: trajectory[-n_frames - 1],
+                         BKWD: trajectory[n_frames]}[direction]
             sub_freq = self._make_contact_freq(paths.Trajectory([sub_frame]))
-            logger.debug("Subtracting frame from contact frequency")
+            if logger.isEnabledFor(logging.debug):
+                logger.debug("Subtracting frame %d from contact frequency",
+                             trajectory.index(sub_frame))
             self.contact_frequency.subtract_contact_frequency(sub_freq)
 
+        _debug_most_common()
         logger.debug("Contact frequency based on length %d",
                      self.contact_frequency.n_frames)
         logger.debug("END MultipleBindingEnsembleCache._update")
-
 
 
 class MultipleBindingEnsemble(paths.Ensemble):
@@ -292,8 +302,7 @@ class MultipleBindingEnsemble(paths.Ensemble):
         #   2. subtraj has stable contacts and is outside excluded volume
 
         # This is the short form of the code used below. The longer version
-        # (with explicit short-circuits) is used to make debug logging
-        # better.
+        # (with explicit short-circuits) is used to make logging better.
         # in_ensemble = (
             # state(trajectory[frame_idx])
             # or (
@@ -318,7 +327,7 @@ class MultipleBindingEnsemble(paths.Ensemble):
             if not excl_vol_res:
                 in_ensemble = False
 
-        logger.info("* Outside excluded volume " + keys[excl_vol_res])
+        logger.info("* Outside excluded volume: " + keys[excl_vol_res])
 
         if in_ensemble is None:
             stable_res = stable_contact_check(trajectory, cache=cache)
@@ -375,12 +384,14 @@ class MultipleBindingEnsemble(paths.Ensemble):
 
     def can_append(self, trajectory, trusted=None):
         if trusted:
+            logger.debug("can_append trusted")
             result = self._trusted_analysis(trajectory=trajectory,
                                             state=self.states,
                                             direction=FWD,
                                             is_check=False,
                                             cache=self.cache[FWD])
         else:
+            logger.debug("can_append untrusted")
             subtraj, cache = self._untrusted_can_continue(
                 trajectory=trajectory,
                 state=self.states,
@@ -399,6 +410,9 @@ class MultipleBindingEnsemble(paths.Ensemble):
         # TODO
 
     def __call__(self, trajectory, trusted=None, candidate=False):
+        if not self.initial_state(trajectory[0]):
+            return False
+
         if candidate:
             result = self._trusted_analysis(trajectory=trajectory,
                                             state=self.final_state,
